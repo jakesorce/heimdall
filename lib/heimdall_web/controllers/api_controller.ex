@@ -1,7 +1,9 @@
+require Integer
+require Decimal
+
 defmodule HeimdallWeb.ApiController do
   use HeimdallWeb, :controller
   import Plug.Conn
-
 
   # this route takes one upc, and returns the upc with the check digit added
   # http://0.0.0.0:4000/api/add_check_digit/1234
@@ -13,7 +15,7 @@ defmodule HeimdallWeb.ApiController do
   # this route takes a comma separated list and should add a check digit to each element
   # http://0.0.0.0:4000/api/add_a_bunch_of_check_digits/12345,233454,34341432
   def add_a_bunch_of_check_digits(conn, params) do
-    check_digits_with_upc = String.split(params.upcs, ",")
+    check_digits_with_upc = String.split(params["upcs"], ",")
     |> tl
     |> Enum.map((fn upc -> _calculate_check_digit(upc) end))
 
@@ -22,8 +24,21 @@ defmodule HeimdallWeb.ApiController do
 
   # these are private methods
   defp _calculate_check_digit(upc) do
-    #this is where your code to calculate the check digit should go
-    upc
+    alias Integer, as: I
+
+    digits = String.to_integer(upc)
+    |> Integer.digits
+    |> Enum.with_index
+
+    odd_total = Enum.filter(digits, fn({_k, index}) -> I.is_even(index) end)
+    |> Enum.reduce(0, fn(x, acc) -> elem(x, 0) + acc end)
+    |> Kernel.*(3)
+
+    even_total = Enum.filter(digits, fn({_k, index}) -> I.is_odd(index) end)
+    |> Enum.reduce(0, fn(x, acc) -> elem(x, 0) + acc end)
+
+    check_digit = rem(odd_total + even_total, 10)
+    if (check_digit == 0), do: check_digit, else: 10 - check_digit
   end
 
   # this is a thing to format your responses and return json to the client
